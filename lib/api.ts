@@ -19,6 +19,14 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
       ...options.headers,
     }
 
+    // Add token from localStorage if it exists
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    console.log(`Fetching ${url}...`)
+
     const response = await fetch(url, { ...options, headers })
     const data = await response.json()
 
