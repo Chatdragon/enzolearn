@@ -32,6 +32,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       setIsLoading(true)
       try {
+        // Check if token exists in localStorage
+        const token = localStorage.getItem("token")
+        if (!token) {
+          setIsLoading(false)
+          return
+        }
+
         const response = await authApi.getUser()
         if (response.success && response.data) {
           setUser(response.data)
@@ -50,16 +57,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true)
     setError(null)
     try {
+      console.log("Attempting login with:", credentials.email)
       const response = await authApi.login(credentials)
+
       if (response.success && response.data) {
+        console.log("Login successful")
         setUser(response.data.user)
         localStorage.setItem("token", response.data.token)
         router.push("/")
       } else {
+        console.error("Login failed:", response.error)
         setError(response.error || "Login failed")
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Login failed")
+      console.error("Login error:", error)
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to connect to the server. Please make sure the backend is running.",
+      )
     } finally {
       setIsLoading(false)
     }
@@ -78,7 +94,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(response.error || "Registration failed")
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Registration failed")
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to connect to the server. Please make sure the backend is running.",
+      )
     } finally {
       setIsLoading(false)
     }
@@ -107,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(response.error || "Failed to send password reset email")
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to send password reset email")
+      setError(error instanceof Error ? error.message : "Failed to connect to the server")
     } finally {
       setIsLoading(false)
     }
@@ -124,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(response.error || "Failed to reset password")
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to reset password")
+      setError(error instanceof Error ? error.message : "Failed to connect to the server")
     } finally {
       setIsLoading(false)
     }
@@ -141,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(response.error || "Failed to update user")
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to update user")
+      setError(error instanceof Error ? error.message : "Failed to connect to the server")
     } finally {
       setIsLoading(false)
     }
