@@ -2,195 +2,136 @@
 
 import type React from "react"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { useState, useEffect } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { authApi } from "@/lib/api"
-import { useStore } from "@/lib/store"
-import type { User, LoginCredentials, RegisterCredentials } from "@/lib/types"
+import { useAuth } from "@/lib/auth-context"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Loader2, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
-interface AuthContextType {
-  user: User | null
-  isLoading: boolean
-  error: string | null
-  login: (credentials: LoginCredentials) => Promise<void>
-  register: (credentials: RegisterCredentials) => Promise<void>
-  logout: () => Promise<void>
-  forgotPassword: (email: string) => Promise<void>
-  resetPassword: (token: string, password: string) => Promise<void>
-  updateUser: (data: Partial<User>) => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export default function Login() {
   const router = useRouter()
-  const { user, setUser } = useStore()
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { login, isLoading, error } = useAuth()
+  const [connectionError, setConnectionError] = useState<string | null>(null)
 
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  })
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setConnectionError(null)
+
+    try {
+      await login(formData)
+    } catch (err) {
+      setConnectionError("Failed to connect to the server. Please make sure the backend is running.")
+    }
+  }
+
+  // Check if the API is reachable
   useEffect(() => {
-    const initAuth = async () => {
-      setIsLoading(true)
+    const checkApiConnection = async () => {
       try {
-        // Check if token exists in localStorage
-        const token = localStorage.getItem("token")
-        if (!token) {
-          setIsLoading(false)
-          return
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+        const response = await fetch(`${apiUrl}/`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        })
+
+        if (!response.ok) {
+          setConnectionError("API server is not responding correctly. Please check your backend.")
         }
-
-        const response = await authApi.getUser()
-        if (response.success && response.data) {
-          setUser(response.data)
-        }
-      } catch (error) {
-        console.error("Auth initialization error:", error)
-      } finally {
-        setIsLoading(false)
+      } catch (err) {
+        setConnectionError("Cannot connect to the API server. Please make sure the backend is running.")
       }
     }
 
-    initAuth()
-  }, [setUser])
-
-  const login = async (credentials: LoginCredentials) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      console.log("Attempting login with:", credentials.email)
-      const response = await authApi.login(credentials)
-
-      if (response.success && response.data) {
-        console.log("Login successful")
-        setUser(response.data.user)
-        localStorage.setItem("token", response.data.token)
-        router.push("/")
-      } else {
-        console.error("Login failed:", response.error)
-        setError(response.error || "Login failed")
-      }
-    } catch (error) {
-      console.error("Login error:", error)
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to connect to the server. Please make sure the backend is running.",
-      )
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const register = async (credentials: RegisterCredentials) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await authApi.register(credentials)
-      if (response.success && response.data) {
-        setUser(response.data.user)
-        localStorage.setItem("token", response.data.token)
-        router.push("/")
-      } else {
-        setError(response.error || "Registration failed")
-      }
-    } catch (error) {
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to connect to the server. Please make sure the backend is running.",
-      )
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const logout = async () => {
-    setIsLoading(true)
-    try {
-      await authApi.logout()
-      setUser(null)
-      localStorage.removeItem("token")
-      router.push("/login")
-    } catch (error) {
-      console.error("Logout error:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const forgotPassword = async (email: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await authApi.forgotPassword(email)
-      if (!response.success) {
-        setError(response.error || "Failed to send password reset email")
-      }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to connect to the server")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const resetPassword = async (token: string, password: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await authApi.resetPassword(token, password)
-      if (response.success) {
-        router.push("/login")
-      } else {
-        setError(response.error || "Failed to reset password")
-      }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to connect to the server")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const updateUser = async (data: Partial<User>) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await authApi.updateUser(data)
-      if (response.success && response.data) {
-        setUser(response.data)
-      } else {
-        setError(response.error || "Failed to update user")
-      }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to connect to the server")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    checkApiConnection()
+  }, [])
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        error,
-        login,
-        register,
-        logout,
-        forgotPassword,
-        resetPassword,
-        updateUser,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  )
-}
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">EnzoLearn</CardTitle>
+          <CardDescription className="text-center">Sign in to your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {connectionError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{connectionError}</AlertDescription>
+            </Alert>
+          )}
 
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                required
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              />
+            </div>
+
+            {error && (
+              <div className="p-3 text-sm border border-destructive/50 rounded-lg bg-destructive/10 text-destructive">
+                {error}
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </form>
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-4">
+          <div className="text-sm text-center text-muted-foreground">
+            Don't have an account?{" "}
+            <Link href="/register" className="text-primary hover:underline">
+              Sign up
+            </Link>
+          </div>
+
+          <div className="text-xs text-center text-muted-foreground">
+            <p>For testing, use:</p>
+            <p>Email: test@example.com</p>
+            <p>Password: password123</p>
+          </div>
+        </CardFooter>
+      </Card>
+    </div>
+  )
 }
 
